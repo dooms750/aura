@@ -1,0 +1,17 @@
+{
+  "name": "Aura · Contour vivant",
+  "short_name": "Aura",
+  "description": "Un buste de particules de lumière qui suit ton visage, tes mains et ton aura.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#01040d",
+  "theme_color": "#01040d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
