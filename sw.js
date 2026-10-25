@@ -1,6 +1,6 @@
 /* Service worker d'Aura : la page est servie depuis le réseau (mises à jour), les bibliothèques et modèles lourds
    (Three.js, MediaPipe, ~20 Mo) sont gardés en cache après le premier chargement, pour un démarrage rapide et hors ligne. */
-const VER = 'aura-v1';
+const VER = 'aura-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const HEAVY = ['cdn.jsdelivr.net', 'storage.googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
