@@ -153,7 +153,8 @@
     <!-- Mode « tableau déjà préparé » (targets.mind présent à côté de la page) -->
     <section class="step" id="readyStep" hidden>
       <h2><span>✓</span> Œuvre prête</h2>
-      <p>Le tableau est déjà enregistré dans l'appli. Lance la caméra et vise-le.</p>
+      <p id="readyText">Le tableau est déjà enregistré dans l'appli. Lance la caméra et vise-le.</p>
+      <div class="bar" id="readyBarWrap" hidden><i id="readyBar"></i></div>
       <div class="actions">
         <button class="primary" id="startReady">Lancer la caméra</button>
       </div>
@@ -246,7 +247,26 @@ function loadImage(src) {
     try { state.img = await loadImage(CONFIG.image); state.aspect = state.img.naturalHeight / state.img.naturalWidth; } catch {}
     $("readyStep").hidden = false;
   } else {
-    $("prepSteps").hidden = false;
+    // Pas de targets.mind : si tableau.jpg est là, l'appli apprend l'œuvre toute seule
+    let img = null;
+    try { img = await loadImage(CONFIG.image); } catch {}
+    if (!img) { $("prepSteps").hidden = false; return; }
+    state.img = img; state.aspect = img.naturalHeight / img.naturalWidth;
+    const btn = $("startReady"), txt = $("readyText");
+    $("readyStep").hidden = false; $("readyBarWrap").hidden = false;
+    btn.disabled = true; btn.textContent = "Préparation…";
+    txt.textContent = "L'appli apprend à reconnaître l'œuvre, une vingtaine de secondes.";
+    try {
+      const compiler = new window.MINDAR.IMAGE.Compiler();
+      await compiler.compileImageTargets([img], (p) => { $("readyBar").style.width = p.toFixed(0) + "%"; });
+      state.targetUrl = URL.createObjectURL(new Blob([await compiler.exportData()]));
+      $("readyBar").style.width = "100%";
+      txt.textContent = "Œuvre prête. Lance la caméra et vise-la.";
+      btn.disabled = false; btn.textContent = "Lancer la caméra";
+    } catch (err) {
+      console.error(err);
+      $("readyStep").hidden = true; $("prepSteps").hidden = false;
+    }
   }
 })();
 
