@@ -220,7 +220,8 @@ const CONFIG = {
   // Fond de la vidéo à rendre transparent :
   //   "vert"  → fond vert uni (incrustation)   "noir" → fond noir uni
   //   "alpha" → vidéo .webm déjà transparente  "aucun" → vidéo affichée telle quelle
-  fond:   "vert",
+  //   "fondu" → vidéo avec décor : bords adoucis, comme une fenêtre ouverte dans le tableau
+  fond:   "fondu",
   videoLargeur: 0.8,        // largeur de la vidéo, en fraction de la largeur du tableau
 };
 
@@ -437,7 +438,7 @@ function buildScene(anchorGroup, aspect, img) {
     await new Promise((res) => { el.onloadedmetadata = res; el.onerror = res; });
     if (!el.videoWidth) return;
     const tex = new THREE.VideoTexture(el); tex.colorSpace = THREE.SRGBColorSpace;
-    const mode = { vert: 1, noir: 2, alpha: 3, aucun: 0 }[CONFIG.fond] ?? 0;
+    const mode = { vert: 1, noir: 2, alpha: 3, fondu: 4, aucun: 0 }[CONFIG.fond] ?? 0;
     vid.mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       uniforms: { uTex: { value: tex }, uMode: { value: mode }, uOpacity: { value: 0 } },
@@ -455,6 +456,9 @@ function buildScene(anchorGroup, aspect, img) {
             a = smoothstep(0.05, 0.18, max(c.r, max(c.g, c.b)));
           } else if (uMode == 3) {
             a = c.a;
+          } else if (uMode == 4) {                  // bords adoucis
+            vec2 d = min(vUv, 1.0 - vUv);
+            a = smoothstep(0.0, 0.12, d.x) * smoothstep(0.0, 0.18, d.y);
           }
           if (a < 0.02) discard;
           gl_FragColor = vec4(c.rgb, a * uOpacity);
