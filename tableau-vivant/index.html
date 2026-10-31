@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Tableau Vivant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Mise en page : un cartel de musée posé sur un mur sombre, puis la caméra plein écran. */
+  :root {
+    --wall: #12141a;        /* mur de salle d'exposition */
+    --panel: #1b1e26;
+    --line: #2c303b;
+    --text: #ece8df;
+    --muted: #9a9789;
+    --gilt: #d6b25e;        /* dorure de cadre */
+    --gilt-ink: #1a1408;
+    --ok: #7cc49a;
+    --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--wall); color: var(--text);
+    font: 15px/1.55 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+
+  /* ---------- Écran d'accueil ---------- */
+  #home {
+    min-height: 100%;
+    display: grid; place-items: center;
+    padding-block: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .cartel { width: 100%; max-width: 30rem; display: grid; gap: 22px; }
+  .eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--gilt); }
+  h1 {
+    font: 400 clamp(2.6rem, 11vw, 3.6rem)/1 var(--display);
+    margin: 0; letter-spacing: -.01em; text-wrap: balance;
+  }
+  h1 em { color: var(--gilt); }
+  .lede { color: var(--muted); margin: 0; max-width: 34ch; }
+
+  .step {
+    border-top: 1px solid var(--line);
+    padding-top: 18px; display: grid; gap: 12px;
+  }
+  .step h2 { font: 600 13px/1.3 var(--body); margin: 0; display: flex; gap: 10px; align-items: baseline; }
+  .step h2 span { font: italic 400 20px/1 var(--display); color: var(--gilt); }
+  .step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .drop {
+    position: relative; display: grid; place-items: center;
+    aspect-ratio: 4 / 3; max-width: 100%;
+    border: 1px dashed var(--line); border-radius: 4px;
+    background: var(--panel); color: var(--muted);
+    overflow: hidden; cursor: pointer; text-align: center; padding: 16px;
+  }
+  .drop:focus-within { outline: 2px solid var(--gilt); outline-offset: 2px; }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0c0d11; }
+
+  .bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--gilt); transition: width .2s; }
+  .status { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .status.ok { color: var(--ok); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  button, .btn {
+    font: 600 15px/1 var(--body); border-radius: 999px; cursor: pointer;
+    padding: 15px 22px; border: 1px solid transparent; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .primary { background: var(--gilt); color: var(--gilt-ink); flex: 1 1 auto; }
+  .primary:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+  .ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  button:focus-visible, .btn:focus-visible { outline: 2px solid var(--gilt); outline-offset: 3px; }
+
+  .note { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .note code { color: var(--text); font-size: 12px; }
+
+  /* ---------- Vue AR ---------- */
+  #ar { position: fixed; inset: 0; background: #000; }
+  #stage { position: absolute; inset: 0; overflow: hidden; }
+  #stage video { object-fit: cover; }
+  .hud {
+    position: absolute; left: 0; right: 0; z-index: 5; pointer-events: none;
+    display: flex; justify-content: center;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .hud.top { top: 0; padding-top: calc(14px + env(safe-area-inset-top)); justify-content: space-between; align-items: center; }
+  .hud.bottom { bottom: 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+  .hud > * { pointer-events: auto; }
+  .chip {
+    background: rgba(18,20,26,.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    color: var(--text); border: 1px solid rgba(255,255,255,.12);
+    padding: 10px 16px; border-radius: 999px; font-size: 14px;
+  }
+  .chip.found { color: var(--gilt); }
+  #back { padding: 10px 16px; font-size: 14px; }
+
+  /* viseur : quatre coins de cadre */
+  #finder {
+    position: absolute; z-index: 4; pointer-events: none;
+    left: 50%; top: 50%; width: min(72vw, 360px); aspect-ratio: 3 / 4;
+    transform: translate(-50%, -50%);
+    --c: var(--gilt);
+    background:
+      linear-gradient(var(--c),var(--c)) top left / 28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) top left / 2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) top right / 28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) top right / 2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) bottom left / 28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) bottom left / 2px 28px no-repeat,
+      linear-gradient(var(--c),var(--c)) bottom right / 28px 2px no-repeat,
+      linear-gradient(var(--c),var(--c)) bottom right / 2px 28px no-repeat;
+    animation: breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes breathe { 50% { opacity: .35; transform: translate(-50%, -50%) scale(.97); } }
+  @media (prefers-reduced-motion: reduce) { #finder { animation: none; } }
+</style>
+
+<!-- three.js + MindAR, chargés depuis un CDN -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "mindar-image": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js",
+    "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ================= ACCUEIL ================= -->
+<main id="home">
+  <div class="cartel">
+    <div>
+      <div class="eyebrow">Réalité augmentée · un tableau</div>
+      <h1>Le tableau <em>s'anime</em></h1>
+    </div>
+    <p class="lede">Vise l'œuvre avec ton téléphone : la toile ondule, puis une soucoupe en jaillit et survole l'œuvre.</p>
+
+    <!-- Mode « tableau déjà préparé » (targets.mind présent à côté de la page) -->
+    <section class="step" id="readyStep" hidden>
+      <h2><span>✓</span> Œuvre prête</h2>
+      <p>Le tableau est déjà enregistré dans l'appli. Lance la caméra et vise-le.</p>
+      <div class="actions">
+        <button class="primary" id="startReady">Lancer la caméra</button>
+      </div>
+      <p class="note"><button class="ghost" id="useOther" style="padding:8px 14px;font-size:13px">Utiliser un autre tableau</button></p>
+    </section>
+
+    <!-- Mode « préparer un tableau » -->
+    <section id="prepSteps" hidden style="display:grid;gap:22px">
+      <div class="step">
+        <h2><span>i</span> Photo du tableau</h2>
+        <p>Une photo bien de face, recadrée sur la toile seule, sans le cadre ni le mur.</p>
+        <label class="drop" for="photo">
+          <span id="dropText">Toucher pour choisir ou prendre une photo</span>
+          <img id="preview" alt="Aperçu du tableau" hidden>
+          <input id="photo" type="file" accept="image/*">
+        </label>
+      </div>
+
+      <div class="step">
+        <h2><span>ii</span> Apprentissage de l'œuvre</h2>
+        <p>L'appli repère les détails qui lui permettront de reconnaître le tableau. Compte 10 à 40 secondes.</p>
+        <div class="bar"><i id="progress"></i></div>
+        <div class="status" id="status">En attente d'une photo</div>
+      </div>
+
+      <div class="step">
+        <h2><span>iii</span> Vise l'œuvre</h2>
+        <div class="actions">
+          <button class="primary" id="startPrep" disabled>Lancer la caméra</button>
+          <a class="btn ghost" id="saveMind" hidden download="targets.mind">Télécharger targets.mind</a>
+        </div>
+        <p class="note">Pour que l'appli reconnaisse ce tableau directement, sans repasser par cette étape, dépose <code>targets.mind</code> et ta photo renommée <code>tableau.jpg</code> à côté de cette page.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ================= VUE AR ================= -->
+<section id="ar" hidden>
+  <div id="stage"></div>
+  <div id="finder"></div>
+  <div class="hud top">
+    <button class="chip" id="back">← Retour</button>
+  </div>
+  <div class="hud bottom">
+    <div class="chip" id="arStatus">Démarrage de la caméra…</div>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import "mindar-image";                    // définit window.MINDAR.IMAGE.Compiler
+import { MindARThree } from "mindar-image-three";
+
+/* ------------------------------------------------------------------
+   Réglages : fichiers optionnels déposés à côté de index.html
+   ------------------------------------------------------------------ */
+const CONFIG = {
+  target: "targets.mind",   // tableau pré-compilé (évite l'étape de préparation)
+  image:  "tableau.jpg",    // photo du tableau (sert à animer la toile elle-même)
+  model:  "animation.glb",  // modèle 3D animé à faire surgir du tableau (Blender → glTF)
+  video:  "video.mp4",      // vidéo à faire surgir du tableau (remplace la soucoupe 3D)
+  // Fond de la vidéo à rendre transparent :
+  //   "vert"  → fond vert uni (incrustation)   "noir" → fond noir uni
+  //   "alpha" → vidéo .webm déjà transparente  "aucun" → vidéo affichée telle quelle
+  fond:   "vert",
+  videoLargeur: 0.8,        // largeur de la vidéo, en fraction de la largeur du tableau
+};
+
+const $ = (id) => document.getElementById(id);
+const state = { targetUrl: null, img: null, aspect: 0.75 };
+
+/* ---------- Au chargement : tableau déjà préparé ? ---------- */
+async function exists(url) {
+  try { const r = await fetch(url, { method: "HEAD", cache: "no-store" }); return r.ok; }
+  catch { return false; }
+}
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const i = new Image(); i.crossOrigin = "anonymous";
+    i.onload = () => res(i); i.onerror = rej; i.src = src;
+  });
+}
+
+(async () => {
+  if (await exists(CONFIG.target)) {
+    state.targetUrl = CONFIG.target;
+    try { state.img = await loadImage(CONFIG.image); state.aspect = state.img.naturalHeight / state.img.naturalWidth; } catch {}
+    $("readyStep").hidden = false;
+  } else {
+    $("prepSteps").hidden = false;
+  }
+})();
+
+$("useOther").onclick = () => { $("readyStep").hidden = true; $("prepSteps").hidden = false; state.targetUrl = null; };
+$("startReady").onclick = startAR;
+$("startPrep").onclick = startAR;
+
+/* ---------- Préparation : photo → fichier de reconnaissance ---------- */
+$("photo").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const status = $("status"), bar = $("progress");
+  status.className = "status"; bar.style.width = "0%";
+  $("startPrep").disabled = true; $("saveMind").hidden = true;
+
+  // Réduit la photo à 1000 px max : plus rapide, et suffisant pour la reconnaissance
+  const raw = await loadImage(URL.createObjectURL(file));
+  const scale = Math.min(1, 1000 / Math.max(raw.naturalWidth, raw.naturalHeight));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(raw.naturalWidth * scale);
+  cv.height = Math.round(raw.naturalHeight * scale);
+  cv.getContext("2d").drawImage(raw, 0, 0, cv.width, cv.height);
+  const img = await loadImage(cv.toDataURL("image/jpeg", 0.92));
+
+  $("preview").src = img.src; $("preview").hidden = false; $("dropText").hidden = true;
+  state.img = img; state.aspect = img.naturalHeight / img.naturalWidth;
+
+  status.textContent = "Analyse du tableau… 0 %";
+  try {
+    const compiler = new window.MINDAR.IMAGE.Compiler();
+    await compiler.compileImageTargets([img], (p) => {
+      bar.style.width = p.toFixed(0) + "%";
+      status.textContent = `Analyse du tableau… ${p.toFixed(0)} %`;
+    });
+    const buffer = await compiler.exportData();
+    const url = URL.createObjectURL(new Blob([buffer]));
+    state.targetUrl = url;
+    $("saveMind").href = url; $("saveMind").hidden = false;
+    bar.style.width = "100%";
+    status.textContent = "Tableau appris. Tu peux lancer la caméra.";
+    status.className = "status ok";
+    $("startPrep").disabled = false;
+  } catch (err) {
+    console.error(err);
+    status.textContent = "L'analyse a échoué. Essaie une photo plus nette, plus détaillée, prise de face.";
+  }
+});
+
+/* ------------------------------------------------------------------
+   La scène 3D posée sur le tableau.
+   Repère MindAR : le tableau fait 1 de large, centré sur (0,0),
+   hauteur = aspect. L'axe z sort du tableau vers le spectateur.
+   ------------------------------------------------------------------ */
+function buildScene(anchorGroup, aspect, img) {
+  const W = 1, H = aspect;
+  const parts = { update: () => {}, reveal: 0 };
+  const updaters = [];
+
+  // 1. La toile qui ondule (si on a la photo du tableau)
+  let canvasMat = null;
+  if (img) {
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+    canvasMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: { uTex: { value: tex }, uTime: { value: 0 }, uAmp: { value: 0 } },
+      vertexShader: `
+        uniform float uTime, uAmp; varying vec2 vUv; varying float vWave;
+        void main() {
+          vUv = uv;
+          vec3 p = position;
+          float edge = sin(uv.x * 3.14159) * sin(uv.y * 3.14159);   // bords fixés au cadre
+          float w = sin(p.x * 9.0 + uTime * 1.6) * cos(p.y * 7.0 - uTime * 1.2);
+          p.z += w * 0.045 * uAmp * edge;
+          vWave = w * edge;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        }`,
+      fragmentShader: `
+        uniform sampler2D uTex; uniform float uAmp, uTime; varying vec2 vUv; varying float vWave;
+        void main() {
+          vec4 c = texture2D(uTex, vUv);
+          c.rgb += vec3(0.95, 0.78, 0.38) * max(vWave, 0.0) * 0.18 * uAmp;   // reflets dorés sur les crêtes
+          gl_FragColor = vec4(c.rgb, uAmp);
+        }`,
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 80, 80), canvasMat);
+    anchorGroup.add(plane);
+    updaters.push((t, r) => { canvasMat.uniforms.uTime.value = t; canvasMat.uniforms.uAmp.value = r; });
+  }
+
+  // 2. Cadre lumineux qui épouse le tableau
+  const frameMat = new THREE.MeshBasicMaterial({ color: 0xd6b25e, transparent: true, opacity: 0 });
+  const th = 0.012;
+  [[W + th, th, 0, H / 2], [W + th, th, 0, -H / 2], [th, H + th, -W / 2, 0], [th, H + th, W / 2, 0]].forEach(([w, h, x, y]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), frameMat);
+    m.position.set(x, y, 0.005); anchorGroup.add(m);
+  });
+  updaters.push((t, r) => { frameMat.opacity = r * (0.55 + 0.45 * Math.sin(t * 2.2)); });
+
+  // 3. Particules dorées qui s'échappent de la toile
+  const N = 700;
+  const pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  const spawn = (i) => {
+    pos[i * 3] = (Math.random() - 0.5) * W;
+    pos[i * 3 + 1] = (Math.random() - 0.5) * H;
+    pos[i * 3 + 2] = Math.random() * 0.02;
+    seed[i] = Math.random();
+  };
+  for (let i = 0; i < N; i++) { spawn(i); pos[i * 3 + 2] = Math.random() * 0.5; }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const dot = document.createElement("canvas"); dot.width = dot.height = 64;
+  const g = dot.getContext("2d"), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, "rgba(255,240,200,1)"); grd.addColorStop(0.3, "rgba(230,190,100,.8)"); grd.addColorStop(1, "rgba(230,190,100,0)");
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  const pMat = new THREE.PointsMaterial({
+    size: 0.03, map: new THREE.CanvasTexture(dot), transparent: true, opacity: 0,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  anchorGroup.add(new THREE.Points(pGeo, pMat));
+  updaters.push((t, r, dt) => {
+    pMat.opacity = r;
+    for (let i = 0; i < N; i++) {
+      const s = seed[i];
+      pos[i * 3]     += Math.sin(t * 0.9 + s * 40) * 0.0009;
+      pos[i * 3 + 1] += (0.025 + s * 0.04) * dt;           // monte lentement
+      pos[i * 3 + 2] += (0.05 + s * 0.12) * dt;            // sort du tableau
+      if (pos[i * 3 + 2] > 0.6 || pos[i * 3 + 1] > H) spawn(i);
+    }
+    pGeo.attributes.position.needsUpdate = true;
+  });
+
+  // 4. La soucoupe qui jaillit du tableau
+  anchorGroup.add(new THREE.HemisphereLight(0xeaf4ff, 0x1a2233, 1.5));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(0.5, 1, 1.5); anchorGroup.add(sun);
+
+  // pivot : la chorégraphie bouge le pivot, le vaisseau (original ou animation.glb) est dedans
+  const pivot = new THREE.Group(); pivot.visible = false; anchorGroup.add(pivot);
+  const ship = new THREE.Group(); pivot.add(ship);
+  const S = W * 0.45; // diamètre de la soucoupe ≈ 45 % de la largeur du tableau
+
+  // Soucoupe originale par défaut
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.9, roughness: 0.22 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a3340, metalness: 0.7, roughness: 0.4 });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9fe8ff, metalness: 0, roughness: 0.05, transmission: 0.6, transparent: true, opacity: 0.55 });
+  const disc = new THREE.Mesh(new THREE.SphereGeometry(S / 2, 64, 24), hullMat);
+  disc.scale.set(1, 0.18, 1); ship.add(disc);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(S / 2, S * 0.025, 12, 96), darkMat);
+  rim.rotation.x = Math.PI / 2; ship.add(rim);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(S * 0.17, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), glassMat);
+  dome.position.y = S * 0.06; ship.add(dome);
+  const belly = new THREE.Mesh(new THREE.CylinderGeometry(S * 0.14, S * 0.2, S * 0.05, 40), darkMat);
+  belly.position.y = -S * 0.09; ship.add(belly);
+  const lights = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const l = new THREE.Mesh(new THREE.SphereGeometry(S * 0.018, 10, 8), new THREE.MeshBasicMaterial({ color: 0x5ff3ff }));
+    l.position.set(Math.cos(a) * S * 0.5, 0, Math.sin(a) * S * 0.5); ship.add(l); lights.push(l);
+  }
+  // rayon lumineux sous la soucoupe
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0x7ff6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(S * 0.12, S * 0.45, 1, 40, 1, true), beamMat);
+  beam.position.y = -0.5;
+  const beamHolder = new THREE.Group(); beamHolder.position.y = -S * 0.1; beamHolder.add(beam); pivot.add(beamHolder);
+
+  // Ton propre modèle (animation.glb) remplace la soucoupe originale
+  let mixer = null;
+  new GLTFLoader().load(CONFIG.model, (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+    const s = S / Math.max(size.x, size.z, 1e-6);
+    model.scale.setScalar(s);
+    model.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-s));
+    ship.clear(); ship.add(model); lights.length = 0;
+    if (gltf.animations.length) {
+      mixer = new THREE.AnimationMixer(model);
+      gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+    }
+  }, undefined, () => { /* pas de modèle : soucoupe originale */ });
+
+  // Ta vidéo (video.mp4) : remplace la soucoupe 3D, avec suppression du fond
+  const vid = { el: null, group: null, mat: null };
+  parts.playVideo = () => { if (vid.el) { vid.el.currentTime = 0; vid.el.play().catch(() => {}); } };
+  (async () => {
+    if (!(await exists(CONFIG.video))) return;
+    const el = document.createElement("video");
+    Object.assign(el, { src: CONFIG.video, muted: true, loop: true, playsInline: true, crossOrigin: "anonymous", preload: "auto" });
+    el.setAttribute("playsinline", ""); el.setAttribute("webkit-playsinline", "");
+    await new Promise((res) => { el.onloadedmetadata = res; el.onerror = res; });
+    if (!el.videoWidth) return;
+    const tex = new THREE.VideoTexture(el); tex.colorSpace = THREE.SRGBColorSpace;
+    const mode = { vert: 1, noir: 2, alpha: 3, aucun: 0 }[CONFIG.fond] ?? 0;
+    vid.mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: { uTex: { value: tex }, uMode: { value: mode }, uOpacity: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `
+        uniform sampler2D uTex; uniform int uMode; uniform float uOpacity; varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(uTex, vUv);
+          float a = 1.0;
+          if (uMode == 1) {                         // fond vert : distance au vert pur
+            float g = c.g - max(c.r, c.b);
+            a = 1.0 - smoothstep(0.08, 0.25, g);
+            c.g = min(c.g, max(c.r, c.b) + 0.05);   // retire le reflet vert sur les bords
+          } else if (uMode == 2) {                  // fond noir : selon la luminosité
+            a = smoothstep(0.05, 0.18, max(c.r, max(c.g, c.b)));
+          } else if (uMode == 3) {
+            a = c.a;
+          }
+          if (a < 0.02) discard;
+          gl_FragColor = vec4(c.rgb, a * uOpacity);
+        }`,
+    });
+    const w = W * CONFIG.videoLargeur, h = w * el.videoHeight / el.videoWidth;
+    vid.group = new THREE.Group();
+    vid.group.add(new THREE.Mesh(new THREE.PlaneGeometry(w, h), vid.mat));
+    anchorGroup.add(vid.group);
+    vid.el = el;
+    ship.visible = false; beamHolder.visible = false;   // la vidéo prend la place de la soucoupe
+    if (pivot.visible) parts.playVideo();
+  })();
+
+  // Chorégraphie : sortie du tableau (0–2,5 s), rayon, puis survol en huit
+  const ease = (x) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+  let since = 0;
+  parts.restart = () => { since = 0; parts.playVideo(); };
+  parts.pause = () => { if (vid.el) vid.el.pause(); };
+  updaters.push((t, r, dt) => {
+    if (mixer) mixer.update(dt);
+    pivot.visible = r > 0.02;
+    if (!pivot.visible) return;
+    since += dt;
+    const e = ease(since / 2.5);                       // sortie
+    const hover = ease((since - 2.5) / 1.5);           // passage au survol
+    const ht = since - 2.5;
+    const fx = Math.sin(ht * 0.6) * W * 0.22 * hover;
+    const fy = Math.sin(ht * 1.2) * H * 0.12 * hover;
+    // la soucoupe naît au centre de la toile et sort vers le spectateur en se redressant
+    pivot.position.set(fx, fy, 0.02 + 0.34 * e + Math.sin(t * 2.2) * 0.012 * hover);
+    pivot.rotation.x = Math.PI / 2 * (1 - e * 0.55);   // face au tableau → vue de trois-quarts
+    pivot.rotation.z = -Math.cos(ht * 0.6) * 0.25 * hover; // inclinaison dans les virages
+    pivot.scale.setScalar(Math.max(0.001, e * r));
+    ship.rotation.y += dt * (0.6 + 2.5 * (1 - e));     // tourne vite en sortant, puis ralentit
+    lights.forEach((l, i) => { l.material.color.setHSL(0.52, 1, 0.45 + 0.35 * (Math.sin(t * 8 - i * 0.8) > 0.4 ? 1 : 0)); });
+    // le rayon s'allume pendant la sortie et vise le tableau
+    const len = pivot.position.z / Math.max(Math.sin(pivot.rotation.x), 0.2) / pivot.scale.x;
+    beamHolder.scale.y = Math.max(0.01, len - S * 0.1);
+    beamMat.opacity = (0.35 * e) * (0.75 + 0.25 * Math.sin(t * 10)) * r;
+    // la vidéo suit la même sortie, en restant face au spectateur
+    if (vid.group) {
+      vid.group.position.set(fx * 0.5, fy * 0.5, 0.02 + 0.3 * e);
+      vid.group.scale.setScalar(Math.max(0.001, (0.2 + 0.8 * e) * r));
+      vid.mat.uniforms.uOpacity.value = Math.min(1, e * 1.5) * r;
+    }
+  });
+
+  parts.update = (t, r, dt) => updaters.forEach((f) => f(t, r, dt));
+  return parts;
+}
+
+/* ---------- Démarrage de la réalité augmentée ---------- */
+let mindar = null;
+
+async function startAR() {
+  if (!state.targetUrl) return;
+  $("home").hidden = true; $("ar").hidden = false;
+  const arStatus = $("arStatus");
+  arStatus.textContent = "Démarrage de la caméra…"; arStatus.className = "chip";
+
+  mindar = new MindARThree({
+    container: $("stage"),
+    imageTargetSrc: state.targetUrl,
+    uiLoading: "no", uiScanning: "no", uiError: "yes",
+    filterMinCF: 0.0001, filterBeta: 0.001,   // lissage : moins de tremblements
+  });
+  const { renderer, scene, camera } = mindar;
+  const anchor = mindar.addAnchor(0);
+  const fx = buildScene(anchor.group, state.aspect, state.img);
+
+  let visible = false, reveal = 0;
+  anchor.onTargetFound = () => {
+    if (reveal < 0.05 && fx.restart) fx.restart();   // la soucoupe rejaillit à chaque nouvelle visée
+    visible = true; $("finder").hidden = true;
+    arStatus.textContent = "Œuvre reconnue"; arStatus.className = "chip found";
+    if (navigator.vibrate) navigator.vibrate(30);
+  };
+  anchor.onTargetLost = () => {
+    visible = false; $("finder").hidden = false;
+    if (fx.pause) fx.pause();
+    arStatus.textContent = "Vise le tableau en entier"; arStatus.className = "chip";
+  };
+
+  try {
+    await mindar.start();
+  } catch (err) {
+    console.error(err);
+    arStatus.textContent = "Caméra inaccessible. La page doit être en https et la caméra autorisée.";
+    return;
+  }
+  arStatus.textContent = "Vise le tableau en entier";
+
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    reveal += ((visible ? 1 : 0) - reveal) * Math.min(1, dt * 2.5);   // apparition douce
+    fx.update(t, reveal, dt);
+    renderer.render(scene, camera);
+  });
+}
+
+$("back").onclick = async () => {
+  if (mindar) {
+    mindar.renderer.setAnimationLoop(null);
+    try { await mindar.stop(); } catch {}
+    $("stage").innerHTML = ""; mindar = null;
+  }
+  $("ar").hidden = true; $("finder").hidden = false; $("home").hidden = false;
+};
+</script>
+</body>
+</html>
